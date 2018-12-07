@@ -24,6 +24,7 @@ matrix:
         - yarn workspace $WORKSPACE build
         - yarn workspace $WORKSPACE test
 
+
     # GUI - desktop
     - language: node_js
       node_js: '8'
@@ -43,7 +44,6 @@ matrix:
     - language: rust
       rust: stable
       os: osx
-      cache: cargo
       before_script: &rust_before_script
         - source env.sh
         - env
@@ -51,15 +51,12 @@ matrix:
       script: &rust_script
         - cargo build --verbose
         - cargo test --verbose
-      before_cache: &rust_before_cache
-        - rm -rf target/debug/incremental/
 
     # Daemon - Windows
     - language: rust
       rust: stable
       os: windows
       cache:  &rust_windows_cache
-        cargo: true
         directories:
           - windows\nsis-plugins\bin
           - windows\windns\bin
@@ -71,7 +68,6 @@ matrix:
         - ./build_windows_modules.sh --dev-build
         - cargo build --verbose
         - cargo test --verbose
-      before_cache: *rust_before_cache
 
     - language: rust
       rust: nightly
@@ -79,7 +75,6 @@ matrix:
       cache: *rust_windows_cache
       before_script: *rust_before_script
       script: *rust_windows_script
-      before_cache: *rust_before_cache
 
     # Daemon - Linux
     - language: rust
@@ -93,7 +88,6 @@ matrix:
          packages:
           - binutils
           - libdbus-1-dev
-      cache: cargo
       before_script: *rust_before_script
       script:
         - cargo build --verbose
@@ -102,25 +96,20 @@ matrix:
         - rustup component add rustfmt-preview
         - cargo fmt --version || true
         - cargo fmt -- --check --unstable-features
-      before_cache: *rust_before_cache
 
     - language: rust
       rust: beta
       os: linux
       addons: *rust_linux_addons
-      cache: cargo
       before_script: *rust_before_script
       script: *rust_script
-      before_cache: *rust_before_cache
 
     - language: rust
       rust: stable
       os: linux
       addons: *rust_linux_addons
-      cache: cargo
       before_script: *rust_before_script
       script: *rust_script
-      before_cache: *rust_before_cache
 
 
 notifications:
