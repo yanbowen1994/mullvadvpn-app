@@ -58,7 +58,7 @@ matrix:
     - language: rust
       rust: stable
       os: windows
-      cache:
+      cache:  &rust_windows_cache
         cargo: true
         directories:
           - windows\nsis-plugins\bin
@@ -71,6 +71,14 @@ matrix:
         - ./build_windows_modules.sh --dev-build
         - cargo build --verbose
         - cargo test --verbose
+      before_cache: *rust_before_cache
+
+    - language: rust
+      rust: nightly
+      os: windows
+      cache: *rust_windows_cache
+      before_script: *rust_before_script
+      script: *rust_windows_script
       before_cache: *rust_before_cache
 
     # Daemon - Linux
