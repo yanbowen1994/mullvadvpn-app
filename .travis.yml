@@ -72,7 +72,7 @@ matrix:
         - cargo build --verbose
         - cargo test --verbose
         # Install and run rustfmt on nightly only until rustfmt.toml settings are stabilized.
-        - rustup component add rustfmt-preview
+        - rustup component add rustfmt
         - cargo fmt --version || true
         - cargo fmt -- --check --unstable-features
       before_cache: *rust_before_cache
