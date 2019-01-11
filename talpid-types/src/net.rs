@@ -24,6 +24,71 @@ impl TunnelEndpoint {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Hash, Deserialize, Serialize, Debug)]
+pub enum ConnectionConfig {
+    OpenVpn(OpenVpnConnectionConfig),
+    Wireguard(WireguardConnectionConfig),
+}
+
+impl ConnectionConfig {
+    pub fn host(&self) -> SocketAddr {
+        match self {
+            ConnectionConfig::OpenVpn(config) => config.host,
+            ConnectionConfig::Wireguard(config) => config.host,
+        }
+    }
+
+    pub fn get_tunnel_endpoint(&self) -> TunnelEndpoint {
+        TunnelEndpoint {
+            address: self.host().ip(),
+            tunnel: match self {
+                ConnectionConfig::OpenVpn(config) => OpenVpnEndpointData::from(config).into(),
+                ConnectionConfig::Wireguard(config) => {
+                    WireguardEndpointData::from(config).into()
+                }
+            },
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+pub struct WireguardConnectionConfig {
+    pub host: SocketAddr,
+    pub gateway: IpAddr,
+    pub link_addresses: Vec<IpAddr>,
+    pub client_private_key: WgPrivateKey,
+    pub peer_public_key: WgPublicKey,
+}
+
+impl fmt::Debug for WireguardConnectionConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct(&"WireguardConnectionConfig")
+            .field("host", &self.host)
+            .field("link_addresses", &self.link_addresses)
+            .field("gateway", &self.gateway)
+            .field("peer_public_key", &self.peer_public_key)
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
+pub struct OpenVpnConnectionConfig {
+    pub host: SocketAddr,
+    pub protocol: TransportProtocol,
+    pub username: String,
+    pub tunnel_alias: String,
+}
+
+impl OpenVpnConnectionConfig {
+    pub fn get_endpoint(&self) -> Endpoint {
+        Endpoint{
+            address: self.host,
+            protocol: self.protocol,
+        }
+    }
+}
+
+
 /// TunnelEndpointData contains data required to connect to a given tunnel endpoint.
 /// Different endpoint types can require different types of data.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -34,6 +99,18 @@ pub enum TunnelEndpointData {
     /// Extra parameters for a Wireguard tunnel endpoint.
     #[serde(rename = "wireguard")]
     Wireguard(WireguardEndpointData),
+}
+
+impl From<OpenVpnEndpointData> for TunnelEndpointData {
+    fn from(endpoint_data: OpenVpnEndpointData) -> TunnelEndpointData {
+        TunnelEndpointData::OpenVpn(endpoint_data)
+    }
+}
+
+impl From<WireguardEndpointData> for TunnelEndpointData {
+    fn from(endpoint_data: WireguardEndpointData) -> TunnelEndpointData {
+        TunnelEndpointData::Wireguard(endpoint_data)
+    }
 }
 
 impl fmt::Display for TunnelEndpointData {
@@ -79,6 +156,16 @@ impl fmt::Display for OpenVpnEndpointData {
     }
 }
 
+impl From<&OpenVpnConnectionConfig> for OpenVpnEndpointData{
+    fn from(config: &OpenVpnConnectionConfig) -> OpenVpnEndpointData {
+        OpenVpnEndpointData {
+            port: config.host.port(),
+            protocol: config.protocol,
+        }
+    }
+}
+
+
 #[derive(Clone, Eq, PartialEq, Hash, Deserialize, Serialize)]
 pub struct WireguardEndpointData {
     /// Port to connect to
@@ -122,6 +209,17 @@ impl fmt::Display for WireguardEndpointData {
     }
 }
 
+impl From<&WireguardConnectionConfig > for WireguardEndpointData {
+    fn from(config: &WireguardConnectionConfig ) -> WireguardEndpointData {
+        WireguardEndpointData {
+            port: config.host.port(),
+            addresses: config.link_addresses.clone(),
+            gateway: config.gateway,
+            client_private_key: Some(config.client_private_key.clone()),
+            peer_public_key: config.peer_public_key.clone(),
+        }
+    }
+}
 
 /// Represents a network layer IP address together with the transport layer protocol and port.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

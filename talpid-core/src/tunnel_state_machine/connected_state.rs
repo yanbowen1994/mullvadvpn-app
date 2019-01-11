@@ -57,7 +57,7 @@ impl ConnectedState {
                 address: remote_proxy.address,
                 protocol: TransportProtocol::Tcp,
             },
-            _ => self.tunnel_parameters.endpoint.to_endpoint(),
+            _ => self.tunnel_parameters.config.get_tunnel_endpoint().to_endpoint(),
         };
 
         let policy = SecurityPolicy::Connected {
@@ -192,7 +192,7 @@ impl TunnelState for ConnectedState {
         shared_values: &mut SharedTunnelStateValues,
         bootstrap: Self::Bootstrap,
     ) -> (TunnelStateWrapper, TunnelStateTransition) {
-        let tunnel_endpoint = bootstrap.tunnel_parameters.endpoint.clone();
+        let tunnel_endpoint = bootstrap.tunnel_parameters.config.get_tunnel_endpoint();
         let connected_state = ConnectedState::from(bootstrap);
 
         if let Err(error) = connected_state.set_security_policy(shared_values) {

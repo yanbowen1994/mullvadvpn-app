@@ -5,12 +5,11 @@ use std::{
     ffi::CString,
     net::{IpAddr, SocketAddr},
 };
-use talpid_types::net::{TunnelOptions, WgPrivateKey, WgPublicKey, WireguardEndpointData};
+use talpid_types::net::{TunnelOptions, WgPrivateKey, WgPublicKey, WireguardConnectionConfig};
 
 pub struct Config {
     pub interface: TunnelConfig,
     pub gateway: IpAddr,
-    pub preferred_name: Option<String>,
 }
 // Smallest MTU that supports IPv6
 const MIN_IPV6_MTU: u16 = 1420;
@@ -18,32 +17,28 @@ const DEFAULT_MTU: u16 = MIN_IPV6_MTU;
 
 impl Config {
     pub fn from_data(
-        ip: IpAddr,
-        data: WireguardEndpointData,
+        connection_config: &WireguardConnectionConfig,
         options: &TunnelOptions,
     ) -> Result<Config> {
-        let private_key = match data.client_private_key {
-            Some(private_key) => private_key,
-            None => bail!(ErrorKind::NoKeyError),
-        };
 
         let mtu = options.wireguard.mtu.unwrap_or(DEFAULT_MTU);
         let ipv6_enabled = options.enable_ipv6 && mtu >= MIN_IPV6_MTU;
         let peer = PeerConfig {
-            public_key: data.peer_public_key,
+            public_key: connection_config.peer_public_key.clone(),
             allowed_ips: all_of_the_internet()
                 .into_iter()
                 .filter(|ip| ip.is_ipv4() || ipv6_enabled)
                 .collect(),
-            endpoint: SocketAddr::new(ip, data.port),
+            endpoint: connection_config.host,
         };
 
         let tunnel_config = TunnelConfig {
-            private_key,
-            addresses: data
-                .addresses
-                .into_iter()
+            private_key: connection_config.client_private_key.clone(),
+            addresses: connection_config
+                .link_addresses
+                .iter()
                 .filter(|ip| ip.is_ipv4() || ipv6_enabled)
+                .cloned()
                 .collect(),
             mtu,
             #[cfg(target_os = "linux")]
@@ -53,8 +48,7 @@ impl Config {
 
         Ok(Config {
             interface: tunnel_config,
-            gateway: data.gateway,
-            preferred_name: Some("talpid".to_string()),
+            gateway: connection_config.gateway,
         })
     }
 

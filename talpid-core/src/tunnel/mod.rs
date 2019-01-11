@@ -6,7 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use talpid_types::net::{TunnelEndpoint, TunnelEndpointData, TunnelOptions};
+use crate::tunnel_state_machine::TunnelParameters;
+use talpid_types::net::{
+    ConnectionConfig, OpenVpnConnectionConfig, TunnelEndpoint, TunnelEndpointData, TunnelOptions,
+    WireguardConnectionConfig,
+};
 
 /// A module for all OpenVPN related tunnel management.
 pub mod openvpn;
@@ -113,10 +117,8 @@ impl TunnelMonitor {
     /// Creates a new `TunnelMonitor` that connects to the given remote and notifies `on_event`
     /// on tunnel state changes.
     pub fn start<L>(
-        tunnel_endpoint: TunnelEndpoint,
-        tunnel_options: &TunnelOptions,
+        tunnel_parameters: &TunnelParameters,
         tunnel_alias: Option<OsString>,
-        username: &str,
         log: Option<PathBuf>,
         resource_dir: &Path,
         on_event: L,
@@ -124,20 +126,22 @@ impl TunnelMonitor {
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
+        let connection_config = &tunnel_parameters.config;
+        let tunnel_options = &tunnel_parameters.options;
         Self::ensure_ipv6_can_be_used_if_enabled(tunnel_options)?;
-        match &tunnel_endpoint.tunnel {
-            TunnelEndpointData::OpenVpn(_) => Self::start_openvpn_tunnel(
-                tunnel_endpoint,
+
+        match connection_config {
+            ConnectionConfig::OpenVpn(config) => Self::start_openvpn_tunnel(
+                &config,
                 tunnel_options,
                 tunnel_alias,
-                username,
                 log,
                 resource_dir,
                 on_event,
             ),
             #[cfg(unix)]
-            TunnelEndpointData::Wireguard(_) => {
-                Self::start_wireguard_tunnel(tunnel_endpoint, tunnel_options, log, on_event)
+            ConnectionConfig::Wireguard(config) => {
+                Self::start_wireguard_tunnel(&config, tunnel_options, log, on_event)
             }
             #[cfg(windows)]
             TunnelEndpointData::Wireguard(_) => bail!(ErrorKind::UnsupportedPlatform),
@@ -146,7 +150,7 @@ impl TunnelMonitor {
 
     #[cfg(unix)]
     fn start_wireguard_tunnel<L>(
-        tunnel_endpoint: TunnelEndpoint,
+        config: &WireguardConnectionConfig,
         tunnel_options: &TunnelOptions,
         log: Option<PathBuf>,
         on_event: L,
@@ -154,15 +158,8 @@ impl TunnelMonitor {
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
-        let TunnelEndpoint { address, tunnel } = tunnel_endpoint;
-        let data = match tunnel {
-            TunnelEndpointData::Wireguard(data) => data,
-            _ => unreachable!("expected wireguard endpoint data"),
-        };
-
         let monitor = wireguard::WireguardMonitor::start(
-            address,
-            data,
+            config,
             tunnel_options,
             log.as_ref().map(|p| p.as_path()),
             on_event,
@@ -174,10 +171,9 @@ impl TunnelMonitor {
     }
 
     fn start_openvpn_tunnel<L>(
-        tunnel_endpoint: TunnelEndpoint,
+        config: &OpenVpnConnectionConfig,
         tunnel_options: &TunnelOptions,
         tunnel_alias: Option<OsString>,
-        username: &str,
         log: Option<PathBuf>,
         resource_dir: &Path,
         on_event: L,
@@ -187,12 +183,11 @@ impl TunnelMonitor {
     {
         let monitor = openvpn::OpenVpnMonitor::start(
             on_event,
-            tunnel_endpoint.to_endpoint(),
+            config,
             tunnel_options,
             tunnel_alias,
             log,
             resource_dir,
-            username,
         )
         .chain_err(|| ErrorKind::TunnelMonitorSetUpError)?;
         Ok(TunnelMonitor {
