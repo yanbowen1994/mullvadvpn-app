@@ -6,10 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::tunnel_state_machine::TunnelParameters;
 use talpid_types::net::{
-    ConnectionConfig, OpenVpnConnectionConfig, TunnelEndpoint, TunnelEndpointData, TunnelOptions,
-    WireguardConnectionConfig,
+    GenericTunnelOptions, OpenVpnTunnelParameters, TunnelParameters, WireguardTunnelParameters,
 };
 
 /// A module for all OpenVPN related tunnel management.
@@ -126,22 +124,15 @@ impl TunnelMonitor {
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
-        let connection_config = &tunnel_parameters.config;
-        let tunnel_options = &tunnel_parameters.options;
-        Self::ensure_ipv6_can_be_used_if_enabled(tunnel_options)?;
+        Self::ensure_ipv6_can_be_used_if_enabled(&tunnel_parameters.get_generic_options())?;
 
-        match connection_config {
-            ConnectionConfig::OpenVpn(config) => Self::start_openvpn_tunnel(
-                &config,
-                tunnel_options,
-                tunnel_alias,
-                log,
-                resource_dir,
-                on_event,
-            ),
+        match tunnel_parameters {
+            TunnelParameters::OpenVpn(config) => {
+                Self::start_openvpn_tunnel(&config, tunnel_alias, log, resource_dir, on_event)
+            }
             #[cfg(unix)]
-            ConnectionConfig::Wireguard(config) => {
-                Self::start_wireguard_tunnel(&config, tunnel_options, log, on_event)
+            TunnelParameters::Wireguard(config) => {
+                Self::start_wireguard_tunnel(&config, log, on_event)
             }
             #[cfg(windows)]
             TunnelEndpointData::Wireguard(_) => bail!(ErrorKind::UnsupportedPlatform),
@@ -150,29 +141,23 @@ impl TunnelMonitor {
 
     #[cfg(unix)]
     fn start_wireguard_tunnel<L>(
-        config: &WireguardConnectionConfig,
-        tunnel_options: &TunnelOptions,
+        config: &WireguardTunnelParameters,
         log: Option<PathBuf>,
         on_event: L,
     ) -> Result<Self>
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
-        let monitor = wireguard::WireguardMonitor::start(
-            config,
-            tunnel_options,
-            log.as_ref().map(|p| p.as_path()),
-            on_event,
-        )
-        .chain_err(|| ErrorKind::TunnelMonitoringError)?;
+        let monitor =
+            wireguard::WireguardMonitor::start(config, log.as_ref().map(|p| p.as_path()), on_event)
+                .chain_err(|| ErrorKind::TunnelMonitoringError)?;
         Ok(TunnelMonitor {
             monitor: InternalTunnelMonitor::Wireguard(monitor),
         })
     }
 
     fn start_openvpn_tunnel<L>(
-        config: &OpenVpnConnectionConfig,
-        tunnel_options: &TunnelOptions,
+        config: &OpenVpnTunnelParameters,
         tunnel_alias: Option<OsString>,
         log: Option<PathBuf>,
         resource_dir: &Path,
@@ -181,21 +166,15 @@ impl TunnelMonitor {
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
-        let monitor = openvpn::OpenVpnMonitor::start(
-            on_event,
-            config,
-            tunnel_options,
-            tunnel_alias,
-            log,
-            resource_dir,
-        )
-        .chain_err(|| ErrorKind::TunnelMonitorSetUpError)?;
+        let monitor =
+            openvpn::OpenVpnMonitor::start(on_event, config, tunnel_alias, log, resource_dir)
+                .chain_err(|| ErrorKind::TunnelMonitorSetUpError)?;
         Ok(TunnelMonitor {
             monitor: InternalTunnelMonitor::OpenVpn(monitor),
         })
     }
 
-    fn ensure_ipv6_can_be_used_if_enabled(tunnel_options: &TunnelOptions) -> Result<()> {
+    fn ensure_ipv6_can_be_used_if_enabled(tunnel_options: &GenericTunnelOptions) -> Result<()> {
         if tunnel_options.enable_ipv6 && !is_ipv6_enabled_in_os() {
             bail!(ErrorKind::EnableIpv6Error);
         } else {

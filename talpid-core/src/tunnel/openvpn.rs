@@ -19,7 +19,7 @@ use std::{
     time::Duration,
 };
 use talpid_ipc;
-use talpid_types::net::{Endpoint, OpenVpnConnectionConfig, OpenVpnProxySettings, TunnelOptions};
+use talpid_types::net::{OpenVpnProxySettings, OpenVpnTunnelParameters};
 
 #[cfg(target_os = "linux")]
 use failure::ResultExt as FailureResultExt;
@@ -106,8 +106,7 @@ impl OpenVpnMonitor<OpenVpnCommand> {
     /// path.
     pub fn start<L>(
         on_event: L,
-        config: &OpenVpnConnectionConfig,
-        tunnel_options: &TunnelOptions,
+        params: &OpenVpnTunnelParameters,
         tunnel_alias: Option<OsString>,
         log_path: Option<PathBuf>,
         resource_dir: &Path,
@@ -115,10 +114,10 @@ impl OpenVpnMonitor<OpenVpnCommand> {
     where
         L: Fn(TunnelEvent) + Send + Sync + 'static,
     {
-        let user_pass_file = Self::create_credentials_file(&config.username, "-")
+        let user_pass_file = Self::create_credentials_file(&params.config.username, "-")
             .chain_err(|| ErrorKind::CredentialsWriteError)?;
 
-        let proxy_auth_file = Self::create_proxy_auth_file(&tunnel_options.openvpn.proxy)
+        let proxy_auth_file = Self::create_proxy_auth_file(&params.options.proxy)
             .chain_err(|| ErrorKind::CredentialsWriteError)?;
 
 
@@ -145,9 +144,8 @@ impl OpenVpnMonitor<OpenVpnCommand> {
             }
         };
         let cmd = Self::create_openvpn_cmd(
-            config,
+            params,
             tunnel_alias,
-            &tunnel_options,
             user_pass_file.as_ref(),
             match proxy_auth_file {
                 Some(ref file) => Some(file.as_ref()),
@@ -337,9 +335,8 @@ impl<C: OpenVpnBuilder> OpenVpnMonitor<C> {
     }
 
     fn create_openvpn_cmd(
-        config: &OpenVpnConnectionConfig,
+        params: &OpenVpnTunnelParameters,
         tunnel_alias: Option<OsString>,
-        options: &TunnelOptions,
         user_pass_file: &Path,
         proxy_auth_file: Option<&Path>,
         resource_dir: &Path,
@@ -354,10 +351,10 @@ impl<C: OpenVpnBuilder> OpenVpnMonitor<C> {
                 .compat()
                 .chain_err(|| ErrorKind::IpRouteNotFound)?,
         );
-        cmd.remote(config.get_endpoint())
+        cmd.remote(params.config.get_endpoint())
             .user_pass(user_pass_file)
-            .tunnel_options(&options.openvpn)
-            .enable_ipv6(options.enable_ipv6)
+            .tunnel_options(&params.options)
+            .enable_ipv6(params.generic_options.enable_ipv6)
             .tunnel_alias(tunnel_alias)
             .ca(resource_dir.join("ca.crt"));
         if let Some(proxy_auth_file) = proxy_auth_file {

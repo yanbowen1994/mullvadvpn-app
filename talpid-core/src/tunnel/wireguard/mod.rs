@@ -2,7 +2,7 @@ use self::config::Config;
 use super::{TunnelEvent, TunnelMetadata};
 use crate::routing;
 use std::{net::IpAddr, path::Path, sync::mpsc};
-use talpid_types::net::{TunnelOptions, WireguardConnectionConfig};
+use talpid_types::net::{TunnelOptions, WireguardTunnelParameters};
 
 pub mod config;
 mod ping_monitor;
@@ -64,12 +64,11 @@ pub struct WireguardMonitor {
 
 impl WireguardMonitor {
     pub fn start<F: Fn(TunnelEvent) + Send + Sync + 'static>(
-        connection_config: &WireguardConnectionConfig,
-        options: &TunnelOptions,
+        connection_config: &WireguardTunnelParameters,
         log_path: Option<&Path>,
         on_event: F,
     ) -> Result<WireguardMonitor> {
-        let wg_config = Config::from_data(connection_config, options)?;
+        let wg_config = Config::from_data(&connection_config);
         let tunnel = Box::new(WgGoTunnel::start_tunnel(&wg_config, log_path)?);
         let router = routing::RouteManager::new().chain_err(|| ErrorKind::SetupRoutingError)?;
         let event_callback = Box::new(on_event);
