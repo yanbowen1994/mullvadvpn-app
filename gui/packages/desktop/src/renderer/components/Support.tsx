@@ -9,18 +9,18 @@ import {
 } from '@mullvad/components';
 import * as React from 'react';
 import { Component, Text, TextInput, View } from 'reactxp';
+import { AccountToken } from '../../shared/daemon-rpc-types';
 import { pgettext } from '../../shared/gettext';
+import { ISupportReportForm } from '../redux/support/actions';
 import * as AppButton from './AppButton';
 import { Container, Layout } from './Layout';
 import { BackBarItem, NavigationBar } from './NavigationBar';
 import styles from './SupportStyles';
 
-import { AccountToken } from '../../shared/daemon-rpc-types';
-import { ISupportReportForm } from '../redux/support/actions';
-
 enum SendState {
   Initial,
   Confirm,
+  Confirm2,
   Sending,
   Success,
   Failed,
@@ -119,6 +119,10 @@ export default class Support extends Component<ISupportProps, ISupportState> {
   };
 
   public onCancelConfirmation = () => {
+    this.setState({ sendState: SendState.Confirm2 });
+  };
+
+  public onCancelConfirmation2 = () => {
     this.setState({ sendState: SendState.Initial });
   };
 
@@ -127,7 +131,9 @@ export default class Support extends Component<ISupportProps, ISupportState> {
     const header = (
       <SettingsHeader>
         <HeaderTitle>{pgettext('support-view', 'Report a problem')}</HeaderTitle>
-        {(sendState === SendState.Initial || sendState === SendState.Confirm) && (
+        {(sendState === SendState.Initial ||
+          sendState === SendState.Confirm ||
+          sendState === SendState.Confirm2) && (
           <HeaderSubTitle>
             {pgettext(
               'support-view',
@@ -159,7 +165,14 @@ export default class Support extends Component<ISupportProps, ISupportState> {
               </View>
             </ModalContent>
             {sendState === SendState.Confirm ? (
-              <ModalAlert>{this.renderConfirm()}</ModalAlert>
+              <ModalAlert alertId={'confirm'} presentation={'actionsheet'}>
+                {this.renderConfirm()}
+              </ModalAlert>
+            ) : (
+              undefined
+            )}
+            {sendState === SendState.Confirm2 ? (
+              <ModalAlert alertId={'confirm2'}>{this.renderConfirm2()}</ModalAlert>
             ) : (
               undefined
             )}
@@ -222,6 +235,7 @@ export default class Support extends Component<ISupportProps, ISupportState> {
     switch (this.state.sendState) {
       case SendState.Initial:
       case SendState.Confirm:
+      case SendState.Confirm2:
         return this.renderForm();
       case SendState.Sending:
         return this.renderSending();
@@ -236,6 +250,10 @@ export default class Support extends Component<ISupportProps, ISupportState> {
 
   private renderConfirm() {
     return <ConfirmNoEmailDialog onConfirm={this.onSend} onDismiss={this.onCancelConfirmation} />;
+  }
+
+  private renderConfirm2() {
+    return <ConfirmNoEmailDialog2 onConfirm={this.onSend} onDismiss={this.onCancelConfirmation2} />;
   }
 
   private renderForm() {
@@ -405,6 +423,26 @@ class ConfirmNoEmailDialog extends Component<IConfirmNoEmailDialogProps> {
   private confirm = () => {
     this.props.onConfirm();
   };
+
+  private dismiss = () => {
+    this.props.onDismiss();
+  };
+}
+
+class ConfirmNoEmailDialog2 extends Component<IConfirmNoEmailDialogProps> {
+  public render() {
+    return (
+      <View style={styles.confirm_no_email_background}>
+        <View style={styles.confirm_no_email_dialog}>
+          <Text style={styles.confirm_no_email_warning}>
+            I repeat: You are about to send the problem report without a way for us to get back to
+            you. If you want an answer to your report you will have to enter an email address.
+          </Text>
+          <AppButton.RedButton onPress={this.dismiss}>{'ALRIGHTY!'}</AppButton.RedButton>
+        </View>
+      </View>
+    );
+  }
 
   private dismiss = () => {
     this.props.onDismiss();
