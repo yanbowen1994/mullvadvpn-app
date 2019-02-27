@@ -11,8 +11,8 @@ declare module "JSONStream" {
       recurse: boolean;
   }
 
-  export declare function parse(pattern: any): NodeJS.ReadWriteStream;
-  export declare function parse(patterns: any[]): NodeJS.ReadWriteStream;
+  export function parse(pattern: any): NodeJS.ReadWriteStream;
+  export function parse(patterns: any[]): NodeJS.ReadWriteStream;
 
 
   /**
@@ -21,10 +21,10 @@ declare module "JSONStream" {
    * JSONStream.stringify() will create an array,
    * (with default options open='[\n', sep='\n,\n', close='\n]\n')
    */
-  export declare function stringify(): NodeJS.ReadWriteStream;
+  export function stringify(): NodeJS.ReadWriteStream;
 
   /** If you call JSONStream.stringify(false) the elements will only be seperated by a newline. */
-  export declare function stringify(newlineOnly: NewlineOnlyIndicator): NodeJS.ReadWriteStream;
+  export function stringify(newlineOnly: NewlineOnlyIndicator): NodeJS.ReadWriteStream;
   type NewlineOnlyIndicator = false
 
   /**
@@ -33,8 +33,8 @@ declare module "JSONStream" {
    * JSONStream.stringify() will create an array,
    * (with default options open='[\n', sep='\n,\n', close='\n]\n')
    */
-  export declare function stringify(open: string, sep: string, close: string): NodeJS.ReadWriteStream;
+  export function stringify(open: string, sep: string, close: string): NodeJS.ReadWriteStream;
 
-  export declare function stringifyObject(): NodeJS.ReadWriteStream;
-  export declare function stringifyObject(open: string, sep: string, close: string): NodeJS.ReadWriteStream;
+  export function stringifyObject(): NodeJS.ReadWriteStream;
+  export function stringifyObject(open: string, sep: string, close: string): NodeJS.ReadWriteStream;
 }

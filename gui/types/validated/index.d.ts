@@ -36,7 +36,7 @@ declare module 'validated/schema' {
 }
 
 declare module 'validated/object' {
-  export function validate<T>(object: Node<T>, value: any): T {
-    return object.validate(new Context()).value;
-  }
+  import { Node } from 'validated/schema';
+
+  export function validate<T>(object: Node<T>, value: any): T;
 }
